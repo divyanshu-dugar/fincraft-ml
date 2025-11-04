@@ -1,8 +1,11 @@
 services:
   - type: web
-    name: fincraft-ml
+    name: finwise-ml
     env: python
     buildCommand: ""
     startCommand: gunicorn app:app
     plan: free
     region: oregon
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
