@@ -1,12 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
-from dateutil import parser  # More flexible date parsing
+from dateutil import parser
+import collections
 
 app = Flask(__name__)
 CORS(app)
 
-@app.route('/analyze', methods=['POST'])
+@app.route('/api/analyze', methods=['POST'])
 def analyze_expenses():
     try:
         data = request.get_json()
@@ -21,11 +22,10 @@ def analyze_expenses():
                 "insight": "No expenses found for the selected period."
             })
 
-        # ✅ Use dateutil.parser for flexible date handling
+        # Process expenses without pandas
         processed_expenses = []
         for exp in expenses:
             try:
-                # Parse any date format automatically
                 parsed_date = parser.parse(exp['date'])
                 expense_copy = exp.copy()
                 expense_copy['_parsed_date'] = parsed_date
@@ -37,19 +37,20 @@ def analyze_expenses():
         # Sort by parsed date
         processed_expenses.sort(key=lambda x: x['_parsed_date'])
 
-        # Group by month-year
+        # Group by month-year using standard dict
         monthly_data = {}
         for exp in processed_expenses:
             d = exp['_parsed_date']
             key = f"{d.year}-{d.month:02d}"
-            monthly_data.setdefault(key, 0)
+            if key not in monthly_data:
+                monthly_data[key] = 0
             monthly_data[key] += exp['amount']
 
         # Convert to list and sort
         monthly_list = [{"month": key, "amount": amt} for key, amt in monthly_data.items()]
-        monthly_list.sort(key=lambda x: x['month'])  # String sort works for YYYY-MM format
+        monthly_list.sort(key=lambda x: x['month'])
 
-        # Generate insight (same as before)
+        # Generate insight
         if len(monthly_list) >= 2:
             prev, curr = monthly_list[-2], monthly_list[-1]
             change = ((curr["amount"] - prev["amount"]) / prev["amount"]) * 100 if prev["amount"] != 0 else 0
@@ -69,9 +70,10 @@ def analyze_expenses():
         print(f"Error in analyze_expenses: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
-@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "service": "Flask AI Service"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
